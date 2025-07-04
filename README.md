@@ -37,7 +37,7 @@ python process.py --pdf <path_to_pdf> [--model <tts_model>] [--num-pages <N>] [-
 
 ### Arguments
 - `--pdf` (required): Path to the PDF file to convert.
-- `--model`: TTS model to use (default: `tts_models/fr/css10/vits`). Note: This project is optimized for French text processing.
+- `--model`: TTS model to use (default: `tts_models/fr/css10/vits`).
 - `--num-pages`: Number of pages to process (default: all pages).
 - `--language`: Language code for TTS synthesis (e.g., `fr-fr`).
 - `--speaker`: Speaker name (if supported by the model).
