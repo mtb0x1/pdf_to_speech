@@ -145,7 +145,7 @@ def synthesize_chunks_to_audio(
 # python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model tts_models/fr/css10/vits --num-pages 5
 def main():
     args = parse_args()
-    log_level = args.log_level.upper()
+    log_level = args.log_level.upper() if args.log_level is not None else "INFO"
     logger.setLevel(getattr(logging, log_level, logging.INFO))
     logger.debug(f"Log level set to {log_level}")
     logger.debug(f"Arguments received: {args}")
