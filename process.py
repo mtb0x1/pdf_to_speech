@@ -134,8 +134,12 @@ def synthesize_chunks_to_audio(
         if language is not None:
             tts_kwargs["language"] = language
         logger.debug(f"tts_to_file kwargs: {tts_kwargs}")
-        tts.tts_to_file(**tts_kwargs)
-        logger.debug(f"Finished synthesizing chunk {idx+1}")
+        try:
+            tts.tts_to_file(**tts_kwargs)
+            logger.debug(f"Finished synthesizing chunk {idx+1}")
+        except Exception as e:
+            logger.error(f"Failed to synthesize chunk {idx+1}: {e}")
+            logger.debug(f"Continuing with next chunk...")
 
 #examples :
 # python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model tts_models/fr/css10/vits --num-pages 5
