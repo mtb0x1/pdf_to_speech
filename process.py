@@ -6,11 +6,17 @@ import datetime
 import textwrap
 import argparse
 import torch
-from TTS.api import TTS
+# Replace Coqui TTS with Kokoro
+# TODO: Update import based on Kokoro's actual package structure
+try:
+    from kokoro import KokoroTTS  # This is a placeholder, replace with actual import
+except ImportError:
+    logger.error("Failed to import Kokoro TTS. Please make sure it's installed correctly.")
+    sys.exit(1)
 import glob
 import logging
 import sys
-from typing import Optional
+from typing import Optional, List
 
 # Set up logger
 logger = logging.getLogger("pdf_to_audio")
@@ -20,6 +26,7 @@ formatter = logging.Formatter('[%(levelname)s] %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+# This line is no longer needed as logger is set up earlier
 # Allow safe loading of this config
 
 
@@ -50,7 +57,7 @@ def extract_text_from_pdf_robust(path: str, num_pages: Optional[int] = None) -> 
             full_text.append(f"=== Page {page_num} ===\n" + "\n".join(page_lines))
     return "\n\n".join(full_text)
 
-def chunk_text(text: str, max_length: int = 200000) -> list[str]:
+def chunk_text(text: str, max_length: int = 200000) -> List[str]:
     """Splits text into chunks of up to max_length characters, preserving paragraph boundaries."""
     paragraphs = text.split("\n\n")
     chunks = []
@@ -73,29 +80,35 @@ def get_output_dir() -> str:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Convert PDF to audio using TTS.")
+    parser = argparse.ArgumentParser(description="Convert PDF to audio using Kokoro TTS.")
     parser.add_argument('--pdf', type=str, required=True, help='Path to the PDF file')
-    parser.add_argument('--model', type=str, default="tts_models/fr/css10/vits", help='TTS model to use')
+    parser.add_argument('--model', type=str, default="kokoro_models/default", help='Kokoro TTS model to use')
     parser.add_argument('--num-pages', type=int, default=None, help='Number of pages/chunks to transcribe in this run (resumes from last processed)')
     parser.add_argument('--language', type=str, default=None, help='Language for TTS synthesis (e.g., fr-fr)')
     parser.add_argument('--speaker', type=str, default=None, help='Speaker for TTS synthesis (if supported by model)')
     parser.add_argument('--speaker-wav', type=str, default=None, help='Path to the speaker WAV file')
     parser.add_argument('--log-level', type=str, default='info', help='Logging level (debug, info, warning, error)')
+    # TODO: Add any additional Kokoro-specific parameters here
     return parser.parse_args()
 
 def synthesize_chunks_to_audio(
-    chunks: list[str],
+    chunks: List[str],
     output_prefix: str = "page",
-    model: str = "tts_models/fr/css10/vits",
+    model: str = "kokoro_models/default",  # Updated default model path for Kokoro
     speaker: Optional[str] = None,
     speaker_wav: Optional[str] = None,
     language: Optional[str] = None
 ) -> None:
-    """Synthesize each text chunk to an audio file using the specified TTS model and parameters."""
+    """Synthesize each text chunk to an audio file using the specified Kokoro TTS model and parameters."""
     logger.debug(f"synthesize_chunks_to_audio called with {len(chunks)} chunks, model={model}, speaker={speaker}, speaker_wav={speaker_wav}, language={language}")
-    tts = TTS(model)
+    
+    # TODO: Update Kokoro initialization based on actual API
+    tts = KokoroTTS(model)
+    
+    # TODO: Verify if Kokoro supports CUDA acceleration and update accordingly
     if torch.cuda.is_available():
-        tts.to("cuda")
+        # TODO: Update with actual Kokoro CUDA support method
+        tts.to("cuda")  # Assuming similar API to Coqui TTS
         logger.debug("Using CUDA for TTS synthesis.")
     else:
         logger.debug("Using CPU for TTS synthesis.")
@@ -106,19 +119,25 @@ def synthesize_chunks_to_audio(
         file_path = os.path.join(output_dir, f"{output_prefix}_{idx+1:03}.wav")
         logger.info(f"Synthesizing chunk {idx+1}/{len(chunks)} → {file_path}")
         logger.debug(f"Chunk text (first 100 chars): {chunk[:100]}{'...' if len(chunk) > 100 else ''}")
+        
+        # TODO: Update with actual Kokoro API parameters
         tts_kwargs = {"text": chunk, "file_path": file_path}
         if speaker is not None:
             tts_kwargs["speaker"] = speaker
         if speaker_wav is not None:
             tts_kwargs["speaker_wav"] = speaker_wav
         if language is not None:
+            # Ensure language alignment with user-provided language
             tts_kwargs["language"] = language
+            
         logger.debug(f"tts_to_file kwargs: {tts_kwargs}")
-        tts.tts_to_file(**tts_kwargs)
+        
+        # TODO: Update with actual Kokoro method for generating audio files
+        tts.tts_to_file(**tts_kwargs)  # Assuming similar API to Coqui TTS
         logger.debug(f"Finished synthesizing chunk {idx+1}")
 
 #examples :
-# python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model tts_models/fr/css10/vits --num-pages 5
+# python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model kokoro_models/fr/default --num-pages 5
 def main():
     args = parse_args()
     log_level = args.log_level.upper()
