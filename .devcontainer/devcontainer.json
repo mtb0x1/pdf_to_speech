@@ -1,0 +1,21 @@
+{
+  "name": "PDF to Speech DevContainer",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "features": {},
+  "postCreateCommand": "pip install uv && uv pip install --upgrade pip && uv pip install TTS pdfminer.six torch",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  "workspaceFolder": "/workspace"
+} 
