@@ -10,7 +10,7 @@ from TTS.api import TTS
 import glob
 import logging
 import sys
-from typing import Optional
+from typing import Optional, List
 
 # Set up logger
 logger = logging.getLogger("pdf_to_audio")
@@ -50,19 +50,39 @@ def extract_text_from_pdf_robust(path: str, num_pages: Optional[int] = None) -> 
             full_text.append(f"=== Page {page_num} ===\n" + "\n".join(page_lines))
     return "\n\n".join(full_text)
 
-def chunk_text(text: str, max_length: int = 200000) -> list[str]:
-    """Splits text into chunks of up to max_length characters, preserving paragraph boundaries."""
+def chunk_text(text: str, max_length: int = 200000) -> List[str]:
+    """Splits text into chunks of up to max_length characters, preserving paragraph boundaries when possible."""
     paragraphs = text.split("\n\n")
     chunks = []
     current_chunk = ""
+    
     for para in paragraphs:
-        if len(current_chunk) + len(para) < max_length:
+        # If the paragraph itself is longer than max_length, we need to split it
+        if len(para) >= max_length:
+            # First add any existing content as a chunk if we have some
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = ""
+            
+            # Split the long paragraph into smaller pieces
+            for i in range(0, len(para), max_length):
+                para_piece = para[i:i+max_length]
+                if i + max_length >= len(para):  # Last piece, add to current_chunk
+                    current_chunk = para_piece + "\n\n"
+                else:  # Complete piece, add directly to chunks
+                    chunks.append(para_piece)
+        # Normal case - paragraph fits within limit
+        elif len(current_chunk) + len(para) < max_length:
             current_chunk += para + "\n\n"
+        # Current chunk would exceed limit, start a new one
         else:
             chunks.append(current_chunk.strip())
             current_chunk = para + "\n\n"
+    
+    # Add the final chunk if there's anything left
     if current_chunk:
         chunks.append(current_chunk.strip())
+    
     return chunks
 
 def get_output_dir() -> str:
@@ -84,7 +104,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def synthesize_chunks_to_audio(
-    chunks: list[str],
+    chunks: List[str],
     output_prefix: str = "page",
     model: str = "tts_models/fr/css10/vits",
     speaker: Optional[str] = None,
@@ -114,14 +134,18 @@ def synthesize_chunks_to_audio(
         if language is not None:
             tts_kwargs["language"] = language
         logger.debug(f"tts_to_file kwargs: {tts_kwargs}")
-        tts.tts_to_file(**tts_kwargs)
-        logger.debug(f"Finished synthesizing chunk {idx+1}")
+        try:
+            tts.tts_to_file(**tts_kwargs)
+            logger.debug(f"Finished synthesizing chunk {idx+1}")
+        except Exception as e:
+            logger.error(f"Failed to synthesize chunk {idx+1}: {e}")
+            logger.debug(f"Continuing with next chunk...")
 
 #examples :
 # python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model tts_models/fr/css10/vits --num-pages 5
 def main():
     args = parse_args()
-    log_level = args.log_level.upper()
+    log_level = args.log_level.upper() if args.log_level is not None else "INFO"
     logger.setLevel(getattr(logging, log_level, logging.INFO))
     logger.debug(f"Log level set to {log_level}")
     logger.debug(f"Arguments received: {args}")
