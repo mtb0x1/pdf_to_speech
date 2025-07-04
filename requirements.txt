@@ -1,0 +1,3 @@
+moshi>=0.2.6
+pdfminer.six
+torch
