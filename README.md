@@ -23,9 +23,9 @@ This project converts PDF documents into speech audio files using a Text-to-Spee
    ```
 2. Install dependencies:
    ```bash
-   pip install TTS pdfminer.six torch
+   pip install TTS==0.13.0 pdfminer.six==20221105 torch==2.0.1
    ```
-   You may need to install additional dependencies for your TTS model (see [Coqui TTS documentation](https://github.com/coqui-ai/TTS)).
+   You may need to install additional dependencies for your TTS model (see [Coqui TTS documentation](https://github.com/coqui-ai/TTS)). For GPU acceleration, install the CUDA-enabled version of torch.
 
 ## Usage
 
