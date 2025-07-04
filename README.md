@@ -23,9 +23,9 @@ This project converts PDF documents into speech audio files using a Text-to-Spee
    ```
 2. Install dependencies:
    ```bash
-   pip install TTS pdfminer.six torch
+   pip install TTS==0.13.0 pdfminer.six==20221105 torch==2.0.1
    ```
-   You may need to install additional dependencies for your TTS model (see [Coqui TTS documentation](https://github.com/coqui-ai/TTS)).
+   You may need to install additional dependencies for your TTS model (see [Coqui TTS documentation](https://github.com/coqui-ai/TTS)). For GPU acceleration, install the CUDA-enabled version of torch.
 
 ## Usage
 
@@ -37,7 +37,7 @@ python process.py --pdf <path_to_pdf> [--model <tts_model>] [--num-pages <N>] [-
 
 ### Arguments
 - `--pdf` (required): Path to the PDF file to convert.
-- `--model`: TTS model to use (default: `tts_models/fr/css10/vits`).
+- `--model`: TTS model to use (default: `tts_models/fr/css10/vits`). Note: This project is optimized for French text processing.
 - `--num-pages`: Number of pages to process (default: all pages).
 - `--language`: Language code for TTS synthesis (e.g., `fr-fr`).
 - `--speaker`: Speaker name (if supported by the model).

@@ -2,15 +2,25 @@
   "name": "PDF to Speech DevContainer",
   "image": "mcr.microsoft.com/devcontainers/python:3.10",
   "features": {},
-  "postCreateCommand": "echo 1",
+  "postCreateCommand": "echo 'Installing system dependencies...' && sudo apt-get update && sudo apt-get install -y libsndfile1 ffmpeg && echo 'Installing Python packages...' && python3 -m pip install --upgrade pip && python3 -m pip install TTS==0.13.0 pdfminer.six==20221105 torch==2.0.1 && echo 'Installing development tools...' && python3 -m pip install black flake8 mypy && echo 'All dependencies installed successfully!'",
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python3"
+        "python.defaultInterpreterPath": "/usr/local/bin/python3",
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": "true",
+        "python.linting.enabled": "true",
+        "python.linting.flake8Enabled": "true",
+        "python.linting.pylintEnabled": "false",
+        "python.analysis.typeCheckingMode": "basic"
       },
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance"
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "matangover.mypy",
+        "njpwerner.autodocstring"
       ]
     }
   },
