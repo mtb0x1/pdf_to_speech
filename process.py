@@ -14,7 +14,8 @@ from typing import Optional, List
 
 # Set up logger
 logger = logging.getLogger("pdf_to_audio")
-logger.setLevel(logging.INFO)
+default_log_level = logging.INFO
+logger.setLevel(default_log_level)
 ch = logging.StreamHandler()
 formatter = logging.Formatter('[%(levelname)s] %(message)s')
 ch.setFormatter(formatter)
@@ -31,10 +32,10 @@ def clean_text(text: str) -> str:
     text = text.replace(" ’", "’").replace(" :", ":")
     return text.strip()
 
-def extract_text_from_pdf_robust(path: str, num_pages: Optional[int] = None) -> str:
-    """Extracts and cleans text from a PDF file, page by page."""
-    laparams = LAParams(line_margin=0.3)  # Controls paragraph merging
-    full_text = []
+def extract_text_from_pdf_robust_per_page(path: str, num_pages: Optional[int] = None) -> List[str]:
+    """Extracts and cleans text from a PDF file, returning a list of per-page texts."""
+    laparams = LAParams(line_margin=0.3)
+    page_texts = []
     for page_num, page_layout in enumerate(extract_pages(path, laparams=laparams), start=1):
         if num_pages is not None and page_num > num_pages:
             break
@@ -47,8 +48,10 @@ def extract_text_from_pdf_robust(path: str, num_pages: Optional[int] = None) -> 
                     if line_text:
                         page_lines.append(line_text)
         if page_lines:
-            full_text.append(f"=== Page {page_num} ===\n" + "\n".join(page_lines))
-    return "\n\n".join(full_text)
+            page_texts.append("\n".join(page_lines))
+        else:
+            page_texts.append("")
+    return page_texts
 
 def chunk_text(text: str, max_length: int = 200000) -> List[str]:
     """Splits text into chunks of up to max_length characters, preserving paragraph boundaries when possible."""
@@ -103,16 +106,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--log-level', type=str, default='info', help='Logging level (debug, info, warning, error)')
     return parser.parse_args()
 
-def synthesize_chunks_to_audio(
-    chunks: List[str],
+def synthesize_pages_to_audio(
+    pages: List[str],
     output_prefix: str = "page",
     model: str = "tts_models/fr/css10/vits",
     speaker: Optional[str] = None,
     speaker_wav: Optional[str] = None,
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    chunk_length: int = 1800
 ) -> None:
-    """Synthesize each text chunk to an audio file using the specified TTS model and parameters."""
-    logger.debug(f"synthesize_chunks_to_audio called with {len(chunks)} chunks, model={model}, speaker={speaker}, speaker_wav={speaker_wav}, language={language}")
+    """Synthesize each page's text (chunked if needed) to audio files using the specified TTS model and parameters."""
+    logger.debug(f"synthesize_pages_to_audio called with {len(pages)} pages, model={model}, speaker={speaker}, speaker_wav={speaker_wav}, language={language}")
     tts = TTS(model)
     if torch.cuda.is_available():
         tts.to("cuda")
@@ -122,32 +126,39 @@ def synthesize_chunks_to_audio(
 
     output_dir = get_output_dir()
     logger.debug(f"Output directory for audio: {output_dir}")
-    for idx, chunk in enumerate(chunks):
-        file_path = os.path.join(output_dir, f"{output_prefix}_{idx+1:03}.wav")
-        logger.info(f"Synthesizing chunk {idx+1}/{len(chunks)} → {file_path}")
-        logger.debug(f"Chunk text (first 100 chars): {chunk[:100]}{'...' if len(chunk) > 100 else ''}")
-        tts_kwargs = {"text": chunk, "file_path": file_path}
-        if speaker is not None:
-            tts_kwargs["speaker"] = speaker
-        if speaker_wav is not None:
-            tts_kwargs["speaker_wav"] = speaker_wav
-        if language is not None:
-            tts_kwargs["language"] = language
-        logger.debug(f"tts_to_file kwargs: {tts_kwargs}")
-        try:
-            tts.tts_to_file(**tts_kwargs)
-            logger.debug(f"Finished synthesizing chunk {idx+1}")
-        except Exception as e:
-            logger.error(f"Failed to synthesize chunk {idx+1}: {e}")
-            logger.debug(f"Continuing with next chunk...")
+    for page_idx, page_text in enumerate(pages):
+        page_number = page_idx + 1
+        chunks = chunk_text(page_text, max_length=chunk_length)
+        if not chunks:
+            logger.info(f"No text to process for page {page_number}.")
+            continue
+        for chunk_idx, chunk in enumerate(chunks):
+            chunk_number = chunk_idx + 1
+            file_path = os.path.join(output_dir, f"{output_prefix}_{page_number:03}_part_{chunk_number}.wav")
+            logger.info(f"Synthesizing page {page_number} part {chunk_number}/{len(chunks)} → {file_path}")
+            logger.debug(f"Chunk text (first 100 chars): {chunk[:100]}{'...' if len(chunk) > 100 else ''}")
+            tts_kwargs = {"text": chunk, "file_path": file_path}
+            if speaker is not None:
+                tts_kwargs["speaker"] = speaker
+            if speaker_wav is not None:
+                tts_kwargs["speaker_wav"] = speaker_wav
+            if language is not None:
+                tts_kwargs["language"] = language
+            logger.debug(f"tts_to_file kwargs: {tts_kwargs}")
+            try:
+                tts.tts_to_file(**tts_kwargs)
+                logger.debug(f"Finished synthesizing page {page_number} part {chunk_number}")
+            except Exception as e:
+                logger.error(f"Failed to synthesize page {page_number} part {chunk_number}: {e}")
+                logger.debug(f"Continuing with next chunk...")
 
 #examples :
 # python process.py --pdf /media/msist/data/La_parole_est_une_force.pdf --model tts_models/fr/css10/vits --num-pages 5
 def main():
     args = parse_args()
-    log_level = args.log_level.upper() if args.log_level is not None else "INFO"
-    logger.setLevel(getattr(logging, log_level, logging.INFO))
-    logger.debug(f"Log level set to {log_level}")
+    if args.log_level is not None :
+        logger.setLevel(getattr(logging, args.log_level.upper() , default_log_level))
+    logger.info(f"Log level set to {logging.getLevelName(logger.level)}")
     logger.debug(f"Arguments received: {args}")
 
     pdf_path = args.pdf
@@ -161,24 +172,23 @@ def main():
     logger.debug(f"Output directory: {output_dir}")
 
     logger.debug(f"Extracting text from PDF: {pdf_path}")
-    raw_text = extract_text_from_pdf_robust(pdf_path, num_pages)
-    logger.debug(f"Extracted text length: {len(raw_text)} characters")
-    chunks = chunk_text(raw_text, max_length=1800)
-    logger.debug(f"Total chunks created: {len(chunks)}")
+    page_texts = extract_text_from_pdf_robust_per_page(pdf_path, num_pages)
+    logger.debug(f"Extracted {len(page_texts)} pages of text")
 
-    if not chunks:
-        logger.info("No text chunks to process.")
+    if not page_texts:
+        logger.info("No text pages to process.")
         return
-    logger.info(f"Processing {len(chunks)} chunks (pages)")
-    for i, chunk in enumerate(chunks, start=1):
-        logger.debug(f"Chunk {i}: {chunk[:100]}{'...' if len(chunk) > 100 else ''}")
-    synthesize_chunks_to_audio(
-        chunks,
+    logger.info(f"Processing {len(page_texts)} pages")
+    for i, page in enumerate(page_texts, start=1):
+        logger.debug(f"Page {i} text (first 100 chars): {page[:100]}{'...' if len(page) > 100 else ''}")
+    synthesize_pages_to_audio(
+        page_texts,
         model=model,
         speaker=speaker,
         speaker_wav=speaker_wav,
         language=language,
-        output_prefix="page"
+        output_prefix="page",
+        chunk_length=1800
     )
 
 if __name__ == "__main__":
